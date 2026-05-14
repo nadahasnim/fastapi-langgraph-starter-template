@@ -8,32 +8,32 @@ This template provides a production-ready FastAPI backend for agentic AI service
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                         FastAPI API                          │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
-│  │   Responses  │  │  Documents   │  │    Health    │      │
-│  └──────────────┘  └──────────────┘  └──────────────┘      │
+│                         FastAPI API                         │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐       │
+│  │   Responses  │  │  Documents   │  │    Health    │       │
+│  └──────────────┘  └──────────────┘  └──────────────┘       │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                    Middleware Layer                          │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
-│  │  Request ID  │  │ Error Handler│  │  Auth Stub   │      │
-│  └──────────────┘  └──────────────┘  └──────────────┘      │
+│                    Middleware Layer                         │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐       │
+│  │  Request ID  │  │ Error Handler│  │  Auth Stub   │       │
+│  └──────────────┘  └──────────────┘  └──────────────┘       │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                   Response Service                           │
-│                  (Observability Wrapper)                     │
+│                   Response Service                          │
+│                  (Observability Wrapper)                    │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                  Orchestrator Graph                          │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
-│  │  RAG Agent   │  │  Tool Agent  │  │ Direct Agent │      │
-│  └──────────────┘  └──────────────┘  └──────────────┘      │
+│                  Orchestrator Graph                         │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐       │
+│  │  RAG Agent   │  │  Tool Agent  │  │ Direct Agent │       │
+│  └──────────────┘  └──────────────┘  └──────────────┘       │
 └─────────────────────────────────────────────────────────────┘
          │                    │                    │
          ▼                    ▼                    ▼
@@ -81,8 +81,9 @@ User Query → RAG Agent → Retrieval → Context → LLM → Response
 ### Modular Agent Architecture
 
 Agents are isolated graph nodes with clear responsibilities:
+
 - **RAG Agent**: Document retrieval + generation
-- **Tool Agent**: Tool execution + result formatting
+- **Tool Agent**: Tool execution + result formatting (currently a stub, extensible via tool registry pattern)
 - **Direct Agent**: Pure LLM generation
 
 This allows independent testing and extension without coupling.
@@ -94,6 +95,7 @@ Langfuse tracing is wrapped in `Observability` class that safely degrades to no-
 ### Structured Error Handling
 
 `AppError` provides consistent error responses:
+
 ```json
 {
   "error": {
@@ -106,6 +108,7 @@ Langfuse tracing is wrapped in `Observability` class that safely degrades to no-
 ### Streaming Support
 
 Responses support SSE streaming for real-time output:
+
 - `response.created` - Initial metadata
 - `response.output.text.delta` - Incremental text
 - `response.output.text.done` - Complete text
@@ -114,12 +117,14 @@ Responses support SSE streaming for real-time output:
 ## Database Schema
 
 ### Conversations
+
 - `id` (UUID)
 - `user_id` (String, nullable)
 - `title` (String)
 - `created_at`, `updated_at`
 
 ### Messages
+
 - `id` (UUID)
 - `conversation_id` (FK)
 - `role` (String: user/assistant)
@@ -128,6 +133,7 @@ Responses support SSE streaming for real-time output:
 - `created_at`
 
 ### Responses
+
 - `id` (UUID)
 - `conversation_id` (FK)
 - `message_id` (FK)
@@ -139,6 +145,7 @@ Responses support SSE streaming for real-time output:
 - `created_at`
 
 ### Documents
+
 - `id` (UUID)
 - `filename` (String)
 - `content_type` (String)
@@ -147,6 +154,7 @@ Responses support SSE streaming for real-time output:
 - `created_at`
 
 ### Document Chunks
+
 - `id` (UUID)
 - `document_id` (FK)
 - `chunk_index` (Integer)
@@ -158,7 +166,7 @@ Responses support SSE streaming for real-time output:
 ## Extension Points
 
 1. **Custom Agents** - Add nodes to orchestrator graph
-2. **Custom Tools** - Implement tool interface
+2. **Custom Tools** - Implement tool interface and register in tool agent (see `docs/extending-agents.md` for examples)
 3. **Custom Loaders** - Add document loaders
 4. **Custom Embeddings** - Swap embedding provider
 5. **Custom LLM Provider** - Implement LlmProvider protocol

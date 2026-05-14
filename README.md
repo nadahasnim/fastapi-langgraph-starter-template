@@ -131,10 +131,10 @@ data: {...}
 The orchestrator routes requests to specialized agents:
 
 - **RAG Agent** - Retrieves documents and generates answers
-- **Tool Agent** - Executes tools and returns results
+- **Tool Agent** - Executes tools and returns results (currently a stub, see tool integration examples in docs)
 - **Direct Agent** - Generates responses without tools or retrieval
 
-See [docs/extending-agents.md](docs/extending-agents.md) for adding custom agents.
+See [docs/extending-agents.md](docs/extending-agents.md) for adding custom agents and tool integrations.
 
 ## RAG Document Ingestion
 
