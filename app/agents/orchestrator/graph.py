@@ -17,14 +17,21 @@ from app.agents.shared.prompt_loader import PromptLoader
 from app.agents.shared.response_formatter import ResponseFormatter
 from app.agents.tool_agent.graph import ToolAgentGraph
 from app.api.v1.schemas.responses import ResponseObject
+from app.core.observability import Observability
 
 
 class OrchestratorGraph:
     _GUARDRAIL_TEXT = "Please send a non-empty, safe request so I can help."
 
-    def __init__(self, llm_provider: LlmProvider, default_model: str) -> None:
+    def __init__(
+        self,
+        llm_provider: LlmProvider,
+        default_model: str,
+        observability: Observability | None = None,
+    ) -> None:
         self._llm_provider = llm_provider
         self._default_model = default_model
+        self._observability = observability or Observability(enabled=False)
         self._response_formatter = ResponseFormatter(default_model=default_model)
         self._prompt_loader = PromptLoader(Path(__file__).parent / "prompts")
         self._system_prompt = self._prompt_loader.render("system.md", {})
@@ -137,21 +144,31 @@ class OrchestratorGraph:
     async def invoke(
         self, input_text: str, metadata: dict[str, Any], model: str | None = None
     ) -> ResponseObject:
-        final_state = cast(
-            OrchestratorRuntimeState,
-            await self._graph.ainvoke(
-                {"input_text": input_text, "metadata": metadata, "model": model}
-            ),
-        )
-        try:
-            response_text = validate_output_text(cast(str, final_state.get("response_text", "")))
-            route = cast(RouteName, final_state.get("route", "guardrail"))
-        except GuardrailViolation:
-            response_text = self._GUARDRAIL_TEXT
-            route = "guardrail"
+        with self._observability.trace(
+            name="agent.orchestrator",
+            metadata={"input": input_text, "model": model or self._default_model},
+        ) as trace:
+            try:
+                final_state = cast(
+                    OrchestratorRuntimeState,
+                    await self._graph.ainvoke(
+                        {"input_text": input_text, "metadata": metadata, "model": model}
+                    ),
+                )
+                try:
+                    response_text = validate_output_text(cast(str, final_state.get("response_text", "")))
+                    route = cast(RouteName, final_state.get("route", "guardrail"))
+                except GuardrailViolation:
+                    response_text = self._GUARDRAIL_TEXT
+                    route = "guardrail"
 
-        return self._response_formatter.format_text(
-            response_text,
-            metadata={**metadata, "route": route},
-            model=model or cast(str, final_state.get("response_model", self._default_model)),
-        )
+                response = self._response_formatter.format_text(
+                    response_text,
+                    metadata={**metadata, "route": route},
+                    model=model or cast(str, final_state.get("response_model", self._default_model)),
+                )
+                trace.update(output={"route": route, "response_id": response.id})
+                return response
+            except Exception as e:
+                trace.update(level="ERROR", status_message=str(e))
+                raise

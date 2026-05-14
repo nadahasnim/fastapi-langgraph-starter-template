@@ -16,6 +16,7 @@ from app.agents.shared.events import (
 from app.agents.shared.llm import OpenRouterLlmProvider
 from app.api.v1.schemas.responses import ResponseCreateRequest, ResponseObject
 from app.core.config import get_settings
+from app.core.observability import Observability
 from app.repositories.conversation_repository import ConversationRepository
 from app.repositories.message_repository import MessageRepository
 from app.repositories.response_repository import ResponseRepository
@@ -33,37 +34,49 @@ class ResponseService:
         default_model: str = "template-deterministic-model",
         session: AsyncSession | None = None,
         orchestrator: ResponseOrchestrator | None = None,
+        observability: Observability | None = None,
     ) -> None:
         settings = get_settings()
         self.default_model = default_model or settings.default_chat_model
         self.session = session
         self.orchestrator = orchestrator or self._build_default_orchestrator()
+        self.observability = observability or Observability(enabled=False)
 
     async def create_response(self, request: ResponseCreateRequest) -> ResponseObject:
         request = ResponseCreateRequest.model_validate(request)
-        response = ResponseObject.model_validate(
-            await self.orchestrator.invoke(request.input, dict(request.metadata), request.model)
-        )
+        
+        with self.observability.trace(
+            name="response.create",
+            metadata={"input": request.input, "model": request.model or self.default_model},
+        ) as trace:
+            try:
+                response = ResponseObject.model_validate(
+                    await self.orchestrator.invoke(request.input, dict(request.metadata), request.model)
+                )
+                trace.update(output={"response_id": response.id, "model": response.model})
+            except Exception as e:
+                trace.update(level="ERROR", status_message=str(e))
+                raise
 
-        if self.session is not None:
-            conversation = await self._get_or_create_conversation(request)
-            message = await MessageRepository(self.session).create(
-                conversation_id=conversation.id,
-                role="user",
-                content=request.input,
-                metadata=request.metadata,
-            )
-            await ResponseRepository(self.session).create(
-                conversation_id=conversation.id,
-                message_id=message.id,
-                model=response.model,
-                output=response.model_dump()["output"],
-                metadata=response.metadata,
-                extensions=response.extensions,
-                response_id=response.id,
-            )
+            if self.session is not None:
+                conversation = await self._get_or_create_conversation(request)
+                message = await MessageRepository(self.session).create(
+                    conversation_id=conversation.id,
+                    role="user",
+                    content=request.input,
+                    metadata=request.metadata,
+                )
+                await ResponseRepository(self.session).create(
+                    conversation_id=conversation.id,
+                    message_id=message.id,
+                    model=response.model,
+                    output=response.model_dump()["output"],
+                    metadata=response.metadata,
+                    extensions=response.extensions,
+                    response_id=response.id,
+                )
 
-        return response
+            return response
 
     async def stream_response(self, request: ResponseCreateRequest) -> AsyncIterator[str]:
         response = await self.create_response(request)
@@ -98,4 +111,5 @@ class ResponseService:
         return OrchestratorGraph(
             llm_provider=OpenRouterLlmProvider(settings=settings),
             default_model=self.default_model or settings.default_chat_model,
+            observability=self.observability,
         )
