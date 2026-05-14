@@ -25,6 +25,10 @@ class ToolAgentGraph:
         graph.add_edge("answer", END)
         return graph
 
+    def get_compiled_graph(self):
+        """Return compiled graph for visualization."""
+        return self._graph
+
     def _answer(self, state: ToolAgentState) -> dict[str, str]:
         return {
             "response_text": self._STUB_TEXT,
