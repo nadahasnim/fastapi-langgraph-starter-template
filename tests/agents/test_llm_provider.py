@@ -111,6 +111,35 @@ async def test_openrouter_llm_provider_complete_uses_passed_model_and_serializes
 
 
 @pytest.mark.asyncio
+async def test_openrouter_llm_provider_complete_uses_configured_temperature() -> None:
+    settings = type(
+        "_Settings",
+        (),
+        {
+            "openrouter_base_url": "https://example.test",
+            "openrouter_api_key": "test-key",
+            "default_chat_model": "default-model",
+            "default_temperature": 0.35,
+        },
+    )()
+    client = _StubClient()
+    provider = OpenRouterLlmProvider(settings=cast(Any, settings), client=client)
+
+    await provider.complete(
+        [LlmMessage(role="user", content="hello")],
+        model="override-model",
+    )
+
+    assert cast(Any, client.chat).completions.calls == [
+        {
+            "model": "override-model",
+            "messages": [{"role": "user", "content": "hello"}],
+            "temperature": 0.35,
+        }
+    ]
+
+
+@pytest.mark.asyncio
 async def test_openrouter_llm_provider_stream_uses_passed_model_and_yields_chunks() -> None:
     settings = type(
         "_Settings",

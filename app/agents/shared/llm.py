@@ -77,10 +77,15 @@ class OpenRouterLlmProvider:
     async def complete(
         self, messages: Sequence[LlmMessage], model: str | None = None
     ) -> LlmResponse:
-        response = await self._client.chat.completions.create(
-            model=self._resolve_model(model),
-            messages=self._serialize_messages(messages),
-        )
+        create_kwargs: dict[str, Any] = {
+            "model": self._resolve_model(model),
+            "messages": self._serialize_messages(messages),
+        }
+        default_temperature = getattr(self._settings, "default_temperature", None)
+        if default_temperature is not None:
+            create_kwargs["temperature"] = default_temperature
+
+        response = await self._client.chat.completions.create(**create_kwargs)
         text = response.choices[0].message.content or ""
         return LlmResponse(text, response.model)
 

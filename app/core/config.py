@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     openrouter_api_key: str = ""
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
     default_chat_model: str = "template-chat-model"
+    default_temperature: float | None = None
     default_embedding_model: str = "template-embedding-model"
     qdrant_url: str = "http://localhost:6333"
     qdrant_collection: str = "documents"

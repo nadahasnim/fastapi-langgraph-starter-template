@@ -1,6 +1,6 @@
 # Agent Backend Template
 
-Reusable FastAPI + LangGraph backend template for agentic AI services with RAG, observability, and evaluation tooling.
+Reusable FastAPI + LangGraph backend template for agentic AI services with RAG-oriented scaffolding, observability, and evaluation tooling.
 
 ## Features
 
@@ -52,6 +52,7 @@ DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/agent_db
 OPENROUTER_API_KEY=your-key-here
 OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
 DEFAULT_CHAT_MODEL=anthropic/claude-3.5-sonnet
+DEFAULT_TEMPERATURE=0.2
 DEFAULT_EMBEDDING_MODEL=openai/text-embedding-3-small
 
 # Vector Store
@@ -95,7 +96,7 @@ Response:
     {
       "type": "message",
       "role": "assistant",
-      "content": [{"type": "text", "text": "..."}]
+      "content": [{"type": "output_text", "text": "..."}]
     }
   ],
   "metadata": {"route": "rag"},
@@ -116,10 +117,10 @@ Response (SSE):
 event: response.created
 data: {"id":"resp_abc123","model":"..."}
 
-event: response.output.text.delta
+event: response.output_text.delta
 data: {"delta":"Hello"}
 
-event: response.output.text.done
+event: response.output_text.done
 data: {"text":"Hello there!"}
 
 event: response.completed
@@ -130,7 +131,7 @@ data: {...}
 
 The orchestrator routes requests to specialized agents:
 
-- **RAG Agent** - Retrieves documents and generates answers
+- **RAG Agent** - RAG response stub with retriever integration points
 - **Tool Agent** - Executes tools and returns results (currently a stub, see tool integration examples in docs)
 - **Direct Agent** - Generates responses without tools or retrieval
 
@@ -139,12 +140,18 @@ See [docs/extending-agents.md](docs/extending-agents.md) for adding custom agent
 ## RAG Document Ingestion
 
 ```bash
-curl -X POST http://localhost:8000/v1/documents \
+  curl -X POST http://localhost:8000/v1/documents/upload \
   -F "file=@document.pdf" \
-  -F "metadata={\"source\":\"manual\"}"
+  -F "user_id=user_123"
 ```
 
-Documents are chunked, embedded, and stored in Qdrant for retrieval.
+Documents are chunked and embedded during ingestion. The current upload route uses an in-memory vector store for the scaffold path; wire `QdrantVectorStore` into the route for persistent retrieval.
+
+## Current Scaffold Status
+
+- Implemented: OpenAI-style `POST /v1/responses`, SSE streaming from the same endpoint, LangGraph orchestrator skeleton, prompt loading, guardrails, persistence, document ingestion pipeline, observability wrapper, eval runners.
+- Partial: RAG retrieval plumbing exists, but the default upload route is not yet wired to persistent Qdrant storage and the shipped RAG agent response remains a scaffold stub.
+- Extension point: tool/function calling is not implemented yet; see `docs/extending-agents.md` for a registry-based example and future function-calling notes.
 
 ## Observability
 

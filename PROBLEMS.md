@@ -1,12 +1,10 @@
 # Background
 
-We're just deployed to client's projects as a Fullstack dev. The project is about making custom agent that will help the user to create user (maker, and checker) to develop service card, and journey map.
-
-Service card is detailed information about Goverment organizations/Entities about what is the service, what it solves, what input and outputs, what documents is needed, etc. And Journey map is a user persona journey (citizen) interacting with the service.
+We're just deployed to client's projects as a Fullstack dev. The project is about making custom agent that help assist the user to create somethings, fill forms, generate artifact, answer about data insights, etc.
 
 ## Specs
 
-from those problems some things that we want to build are like this. Backend agentic python fastapi with Langgraph/Langchain as a agent framework. What we need now is to scaffold or make a project starter template with all the tech stacks setup, so every team in our company have same standards to built agent.
+From those problems some things that we want to build are like this. Backend agentic python fastapi with Langgraph/Langchain as a agent framework. What we need now is to scaffold or make a project starter template with all the tech stacks setup, so every team in our company have same standards to built agent.
 
 ### Backend server goals
 
@@ -48,5 +46,3 @@ Here are some goals that we wanted in our backend service:
 12. Openrouter subscription token credits LLM
 13. mem0 optional, still need further research
 14. Any other package that help read yaml, json, or pdf docs, for ingesting the company/organization docs, rules, policy for knowledge based.
-
-Might be that's all in my mind for now.

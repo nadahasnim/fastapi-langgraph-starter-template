@@ -27,25 +27,21 @@ console.log(data.output[0].content[0].text);
 ### Streaming API
 
 ```typescript
-// Server-Sent Events
-const eventSource = new EventSource(
-  'http://localhost:8000/v1/responses/stream?' + 
-  new URLSearchParams({
-    input: 'Hello',
-    stream: 'true'
-  })
-);
-
-eventSource.addEventListener('response.output.text.delta', (e) => {
-  const data = JSON.parse(e.data);
-  console.log(data.delta); // Incremental text
+// OpenAI-style streaming uses POST /v1/responses with stream=true.
+const response = await fetch('http://localhost:8000/v1/responses', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ input: 'Hello', stream: true })
 });
 
-eventSource.addEventListener('response.completed', (e) => {
-  const data = JSON.parse(e.data);
-  console.log('Complete:', data);
-  eventSource.close();
-});
+const reader = response.body?.getReader();
+const decoder = new TextDecoder();
+
+while (reader) {
+  const { value, done } = await reader.read();
+  if (done) break;
+  console.log(decoder.decode(value, { stream: true }));
+}
 ```
 
 ### React Hook Example
@@ -58,26 +54,44 @@ function useStreamingResponse(input: string) {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!input) return;
+    if (!input) return undefined;
 
     setLoading(true);
     setText('');
 
-    const eventSource = new EventSource(
-      `/v1/responses/stream?input=${encodeURIComponent(input)}&stream=true`
-    );
+    const controller = new AbortController();
 
-    eventSource.addEventListener('response.output.text.delta', (e) => {
-      const data = JSON.parse(e.data);
-      setText(prev => prev + data.delta);
-    });
+    const run = async () => {
+      const response = await fetch('/v1/responses', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ input, stream: true }),
+        signal: controller.signal,
+      });
 
-    eventSource.addEventListener('response.completed', () => {
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+
+      while (reader) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value, { stream: true });
+        for (const eventBlock of chunk.split('\n\n')) {
+          if (!eventBlock.includes('event: response.output_text.delta')) continue;
+          const dataLine = eventBlock.split('\n').find((line) => line.startsWith('data: '));
+          if (!dataLine) continue;
+          const data = JSON.parse(dataLine.slice(6));
+          setText((prev) => prev + data.delta);
+        }
+      }
+
       setLoading(false);
-      eventSource.close();
-    });
+    };
 
-    return () => eventSource.close();
+    void run();
+
+    return () => controller.abort();
   }, [input]);
 
   return { text, loading };
@@ -95,7 +109,7 @@ interface Response {
     type: 'message';
     role: 'assistant';
     content: Array<{
-      type: 'text';
+      type: 'output_text';
       text: string;
     }>;
   }>;
@@ -136,12 +150,9 @@ try {
 async function uploadDocument(file: File) {
   const formData = new FormData();
   formData.append('file', file);
-  formData.append('metadata', JSON.stringify({
-    source: 'user_upload',
-    category: 'documentation'
-  }));
+  formData.append('user_id', 'user_456');
 
-  const response = await fetch('/v1/documents', {
+  const response = await fetch('/v1/documents/upload', {
     method: 'POST',
     body: formData
   });
@@ -239,7 +250,7 @@ ws.send(JSON.stringify({ input: 'Hello' }));
 
 1. **Use request IDs** - Track requests across frontend/backend
 2. **Handle errors gracefully** - Show user-friendly messages
-3. **Implement retry logic** - Handle transient failures
+3. **Keep model params backend-owned** - Configure `DEFAULT_CHAT_MODEL` and `DEFAULT_TEMPERATURE` on the server
 4. **Show loading states** - Indicate processing
 5. **Stream when possible** - Better UX for long responses
 6. **Validate input** - Client-side validation before API call

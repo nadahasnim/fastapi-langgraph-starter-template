@@ -13,7 +13,7 @@ from app.agents.shared.events import (
     RESPONSE_OUTPUT_TEXT_DELTA,
     RESPONSE_OUTPUT_TEXT_DONE,
 )
-from app.agents.shared.llm import OpenRouterLlmProvider
+from app.agents.shared.llm import MockLlmProvider, OpenRouterLlmProvider
 from app.api.v1.schemas.responses import ResponseCreateRequest, ResponseObject
 from app.core.config import get_settings
 from app.core.observability import Observability
@@ -39,8 +39,8 @@ class ResponseService:
         settings = get_settings()
         self.default_model = default_model or settings.default_chat_model
         self.session = session
-        self.orchestrator = orchestrator or self._build_default_orchestrator()
         self.observability = observability or Observability(enabled=False)
+        self.orchestrator = orchestrator or self._build_default_orchestrator()
 
     async def create_response(self, request: ResponseCreateRequest) -> ResponseObject:
         request = ResponseCreateRequest.model_validate(request)
@@ -110,8 +110,16 @@ class ResponseService:
 
     def _build_default_orchestrator(self) -> OrchestratorGraph:
         settings = get_settings()
+        llm_provider = (
+            OpenRouterLlmProvider(settings=settings)
+            if settings.openrouter_api_key
+            else MockLlmProvider(
+                response_text="Template scaffold response",
+                model=self.default_model or settings.default_chat_model,
+            )
+        )
         return OrchestratorGraph(
-            llm_provider=OpenRouterLlmProvider(settings=settings),
+            llm_provider=llm_provider,
             default_model=self.default_model or settings.default_chat_model,
             observability=self.observability,
         )

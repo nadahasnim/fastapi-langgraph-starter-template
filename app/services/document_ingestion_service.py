@@ -60,7 +60,7 @@ class DocumentIngestionService:
 
         # Store chunks and vectors
         chunk_repo = DocumentChunkRepository(self._session)
-        for chunk, vector in zip(chunks, vectors):
+        for chunk, vector in zip(chunks, vectors, strict=False):
             point_id = str(uuid4())
 
             # Store in database

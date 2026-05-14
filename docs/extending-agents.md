@@ -479,6 +479,8 @@ The examples above use simple keyword parsing. Production systems should use:
 6. **Tool Composition** - Chain multiple tools together
 7. **Observability** - Trace tool calls with Langfuse or similar
 
+The scaffold does not implement native LLM function calling yet. The example below is a future extension that requires expanding `LlmProvider.complete()` and response parsing.
+
 Example with LLM function calling:
 
 ```python

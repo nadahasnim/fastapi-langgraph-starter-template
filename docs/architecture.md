@@ -2,7 +2,7 @@
 
 ## Overview
 
-This template provides a production-ready FastAPI backend for agentic AI services with LangGraph orchestration, RAG capabilities, and observability.
+This template provides a production-style FastAPI backend scaffold for agentic AI services with LangGraph orchestration, RAG integration points, and observability.
 
 ## System Components
 
@@ -74,9 +74,9 @@ Request → ResponseService → Orchestrator → Agent
 ### RAG Pipeline
 
 ```
-Document Upload → Chunking → Embedding → Qdrant Storage
-                                              ↓
-User Query → RAG Agent → Retrieval → Context → LLM → Response
+Document Upload → Chunking → Embedding → Vector Store Interface
+                                                    ↓
+User Query → RAG Agent Stub → Retrieval Hook → Context → LLM → Response
 ```
 
 ## Key Design Decisions
@@ -85,7 +85,7 @@ User Query → RAG Agent → Retrieval → Context → LLM → Response
 
 Agents are isolated graph nodes with clear responsibilities:
 
-- **RAG Agent**: Document retrieval + generation
+- **RAG Agent**: Scaffolded retrieval flow with prompt/retriever integration points
 - **Tool Agent**: Tool execution + result formatting (currently a stub, extensible via tool registry pattern)
 - **Direct Agent**: Pure LLM generation
 
@@ -113,8 +113,8 @@ Langfuse tracing is wrapped in `Observability` class that safely degrades to no-
 Responses support SSE streaming for real-time output:
 
 - `response.created` - Initial metadata
-- `response.output.text.delta` - Incremental text
-- `response.output.text.done` - Complete text
+- `response.output_text.delta` - Incremental text
+- `response.output_text.done` - Complete text
 - `response.completed` - Final response object
 
 ## Database Schema
@@ -150,10 +150,10 @@ Responses support SSE streaming for real-time output:
 ### Documents
 
 - `id` (UUID)
+- `user_id` (String)
 - `filename` (String)
 - `content_type` (String)
-- `size_bytes` (Integer)
-- `metadata` (JSONB)
+- `source` (String)
 - `created_at`
 
 ### Document Chunks
@@ -161,9 +161,9 @@ Responses support SSE streaming for real-time output:
 - `id` (UUID)
 - `document_id` (FK)
 - `chunk_index` (Integer)
-- `text` (Text)
-- `metadata` (JSONB)
-- `vector_id` (String, unique)
+- `content` (Text)
+- `chunk_metadata` (JSONB)
+- `qdrant_point_id` (String, unique)
 - `created_at`
 
 ## Extension Points
@@ -188,7 +188,7 @@ Responses support SSE streaming for real-time output:
 ## Performance Considerations
 
 - **Connection Pooling**: SQLAlchemy manages DB connections
-- **Vector Search**: Qdrant provides fast similarity search
+- **Vector Search**: `QdrantVectorStore` exists for persistent similarity search, but the default upload route currently uses `InMemoryVectorStore`
 - **Streaming**: Reduces time-to-first-token
 - **Async**: FastAPI + asyncio for concurrent requests
 - **Caching**: Add Redis for response caching

@@ -43,7 +43,7 @@ class InMemoryVectorStore:
 
         for point_id, (stored_vector, payload) in self._points.items():
             # Cosine similarity
-            dot_product = sum(a * b for a, b in zip(vector, stored_vector))
+            dot_product = sum(a * b for a, b in zip(vector, stored_vector, strict=False))
             magnitude_a = sum(a * a for a in vector) ** 0.5
             magnitude_b = sum(b * b for b in stored_vector) ** 0.5
             score = (

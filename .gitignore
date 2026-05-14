@@ -4,3 +4,6 @@
 .venv/
 __pycache__/
 *.py[cod]
+PLAN.md
+HANDOVER.md
+docs/superpowers/
