@@ -1,0 +1,6 @@
+cases:
+  - name: tool_routing_query
+    input: "Use a tool to help me"
+    checks:
+      - type: contains
+        value: "tool"

@@ -1,0 +1,6 @@
+cases:
+  - name: basic_rag_query
+    input: "What information is in the knowledge base?"
+    checks:
+      - type: contains
+        value: "Template"
