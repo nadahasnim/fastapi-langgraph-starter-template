@@ -56,3 +56,29 @@ def test_export_script_has_export_functions():
     assert hasattr(export_module, "export_rag_agent")
     assert hasattr(export_module, "export_tool_agent")
     assert hasattr(export_module, "OUTPUT_DIR")
+
+
+def test_export_script_writes_png_files(tmp_path, monkeypatch):
+    """Test that export script writes non-empty PNG files."""
+    import scripts.export_graphs as export_module
+
+    # Redirect OUTPUT_DIR to tmp_path
+    monkeypatch.setattr(export_module, "OUTPUT_DIR", tmp_path)
+
+    # Run export functions
+    export_module.export_orchestrator()
+    export_module.export_rag_agent()
+    export_module.export_tool_agent()
+
+    # Verify files exist and are non-empty
+    orchestrator_png = tmp_path / "orchestrator.png"
+    rag_agent_png = tmp_path / "rag-agent.png"
+    tool_agent_png = tmp_path / "tool-agent.png"
+
+    assert orchestrator_png.exists()
+    assert rag_agent_png.exists()
+    assert tool_agent_png.exists()
+
+    assert orchestrator_png.stat().st_size > 0
+    assert rag_agent_png.stat().st_size > 0
+    assert tool_agent_png.stat().st_size > 0
