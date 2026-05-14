@@ -48,9 +48,12 @@ This template provides a production-ready FastAPI backend for agentic AI service
 1. **HTTP Request** arrives at FastAPI endpoint
 2. **Middleware** adds request ID, parses auth, handles errors
 3. **Response Service** creates trace and invokes orchestrator
-4. **Orchestrator** routes to appropriate agent based on input
-5. **Agent** executes logic (RAG retrieval, tool call, or direct LLM)
-6. **Response** formatted and returned with metadata
+4. **Orchestrator** validates input, routes to appropriate agent, validates output
+   - Input guardrail checks for blank/unsafe input
+   - Router selects agent based on input content
+   - Agent executes logic (RAG retrieval, tool call, or direct LLM)
+   - Output guardrail validates response text
+5. **Response** formatted and returned with metadata
 
 ## Data Flow
 

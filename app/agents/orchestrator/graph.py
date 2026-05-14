@@ -46,42 +46,63 @@ class OrchestratorGraph:
 
     def _build_graph(self) -> StateGraph:
         graph = StateGraph(OrchestratorRuntimeState)
+        graph.add_node("input_guardrail", self._input_guardrail)
         graph.add_node("route", self._route_input)
-        graph.add_node("guardrail", self._guardrail_response)
+        graph.add_node("blocked_response", self._blocked_response)
         graph.add_node("clarify", self._clarification_response)
         graph.add_node("rag", self._rag_response)
         graph.add_node("tool", self._tool_response)
         graph.add_node("direct", self._direct_response)
-        graph.add_edge(START, "route")
+        graph.add_node("output_guardrail", self._output_guardrail)
+        
+        graph.add_edge(START, "input_guardrail")
+        graph.add_conditional_edges(
+            "input_guardrail",
+            self._select_after_input_guardrail,
+            {
+                "blocked": "blocked_response",
+                "route": "route",
+            },
+        )
         graph.add_conditional_edges(
             "route",
             self._select_route,
             {
-                "guardrail": "guardrail",
                 "clarify": "clarify",
                 "rag": "rag",
                 "tool": "tool",
                 "direct": "direct",
             },
         )
-        graph.add_edge("guardrail", END)
-        graph.add_edge("clarify", END)
-        graph.add_edge("rag", END)
-        graph.add_edge("tool", END)
-        graph.add_edge("direct", END)
+        graph.add_edge("blocked_response", "output_guardrail")
+        graph.add_edge("clarify", "output_guardrail")
+        graph.add_edge("rag", "output_guardrail")
+        graph.add_edge("tool", "output_guardrail")
+        graph.add_edge("direct", "output_guardrail")
+        graph.add_edge("output_guardrail", END)
         return graph
 
     def get_compiled_graph(self):
         """Return compiled graph for visualization."""
         return self._graph
 
-    def _route_input(self, state: OrchestratorRuntimeState) -> dict[str, object]:
+    def _input_guardrail(self, state: OrchestratorRuntimeState) -> dict[str, object]:
+        """Validate input text and mark if blocked."""
         try:
             input_text = validate_input_text(state["input_text"])
+            return {"input_text": input_text, "input_blocked": False}
         except GuardrailViolation:
-            return {"route": "guardrail"}
+            return {"input_blocked": True, "route": "guardrail"}
 
+    def _select_after_input_guardrail(self, state: OrchestratorRuntimeState) -> str:
+        """Route to blocked_response or route based on input_blocked."""
+        return "blocked" if state.get("input_blocked") else "route"
+
+    def _route_input(self, state: OrchestratorRuntimeState) -> dict[str, object]:
+        """Select route based on input text."""
+        input_text = state["input_text"]
         normalized_text = input_text.lower()
+        
         if len(input_text.strip()) < 3:
             route: RouteName = "clarify"
         elif any(term in normalized_text for term in self._rag_terms):
@@ -91,16 +112,32 @@ class OrchestratorGraph:
         else:
             route = "direct"
 
-        return {"input_text": input_text, "route": route}
+        return {"route": route}
 
     def _select_route(self, state: OrchestratorRuntimeState) -> RouteName:
-        return cast(RouteName, state.get("route", "guardrail"))
+        return cast(RouteName, state.get("route", "direct"))
 
-    def _guardrail_response(self, state: OrchestratorRuntimeState) -> dict[str, object]:
+    def _blocked_response(self, state: OrchestratorRuntimeState) -> dict[str, object]:
+        """Return blocked response for unsafe/invalid input."""
         return {
             "response_text": self._GUARDRAIL_TEXT,
             "response_model": cast(str | None, state.get("model")) or self._default_model,
+            "route": "guardrail",
         }
+
+    def _output_guardrail(self, state: OrchestratorRuntimeState) -> dict[str, object]:
+        """Validate output text before returning."""
+        response_text = cast(str, state.get("response_text", ""))
+        route = cast(RouteName, state.get("route", "guardrail"))
+        
+        try:
+            validated_text = validate_output_text(response_text)
+            return {"response_text": validated_text, "route": route}
+        except GuardrailViolation:
+            return {
+                "response_text": self._GUARDRAIL_TEXT,
+                "route": "guardrail",
+            }
 
     def _clarification_response(self, state: OrchestratorRuntimeState) -> dict[str, object]:
         return {
@@ -132,17 +169,10 @@ class OrchestratorGraph:
             ],
             model=cast(str | None, state.get("model")) or self._default_model,
         )
-        try:
-            response_text = validate_output_text(response.text)
-            route: RouteName = "direct"
-        except GuardrailViolation:
-            response_text = self._GUARDRAIL_TEXT
-            route = "guardrail"
-
         return {
-            "response_text": response_text,
+            "response_text": response.text,
             "response_model": response.model,
-            "route": route,
+            "route": "direct",
         }
 
     async def invoke(
@@ -159,14 +189,8 @@ class OrchestratorGraph:
                         {"input_text": input_text, "metadata": metadata, "model": model}
                     ),
                 )
-                try:
-                    response_text = validate_output_text(
-                        cast(str, final_state.get("response_text", ""))
-                    )
-                    route = cast(RouteName, final_state.get("route", "guardrail"))
-                except GuardrailViolation:
-                    response_text = self._GUARDRAIL_TEXT
-                    route = "guardrail"
+                response_text = cast(str, final_state.get("response_text", ""))
+                route = cast(RouteName, final_state.get("route", "guardrail"))
 
                 response = self._response_formatter.format_text(
                     response_text,

@@ -15,3 +15,4 @@ class OrchestratorRuntimeState(OrchestratorState, total=False):
     route: RouteName
     response_text: str
     response_model: str
+    input_blocked: bool
