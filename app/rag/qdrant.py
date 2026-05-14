@@ -46,7 +46,11 @@ class InMemoryVectorStore:
             dot_product = sum(a * b for a, b in zip(vector, stored_vector))
             magnitude_a = sum(a * a for a in vector) ** 0.5
             magnitude_b = sum(b * b for b in stored_vector) ** 0.5
-            score = dot_product / (magnitude_a * magnitude_b) if magnitude_a and magnitude_b else 0.0
+            score = (
+                dot_product / (magnitude_a * magnitude_b)
+                if magnitude_a and magnitude_b
+                else 0.0
+            )
 
             results.append(VectorSearchResult(point_id=point_id, score=score, payload=payload))
 

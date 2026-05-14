@@ -1,4 +1,3 @@
-from typing import Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -15,7 +14,7 @@ class DocumentChunkRepository:
         chunk_index: int,
         content: str,
         qdrant_point_id: str,
-        metadata: Optional[dict] = None,
+        metadata: dict | None = None,
     ) -> DocumentChunk:
         chunk = DocumentChunk(
             document_id=document_id,
@@ -28,5 +27,5 @@ class DocumentChunkRepository:
         await self.session.flush()
         return chunk
 
-    async def get(self, chunk_id: str) -> Optional[DocumentChunk]:
+    async def get(self, chunk_id: str) -> DocumentChunk | None:
         return await self.session.get(DocumentChunk, chunk_id)

@@ -9,7 +9,9 @@ from app.rag.retriever import Retriever
 async def test_retriever_returns_matching_chunks():
     store = InMemoryVectorStore()
     await store.upsert("point_1", [0.1, 0.2, 0.3, 0.4], {"content": "company policy"})
-    retriever = Retriever(embedding_provider=MockEmbeddingProvider(dimensions=4), vector_store=store)
+    retriever = Retriever(
+        embedding_provider=MockEmbeddingProvider(dimensions=4), vector_store=store
+    )
 
     results = await retriever.search("policy", limit=1)
 

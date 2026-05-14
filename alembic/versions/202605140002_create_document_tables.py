@@ -6,16 +6,15 @@ Create Date: 2026-05-14 23:30:00
 """
 
 from collections.abc import Sequence
-from typing import Optional
 
 import sqlalchemy as sa
 
 from alembic import op
 
 revision: str = "202605140002"
-down_revision: Optional[str] = "202605140001"
-branch_labels: Optional[Sequence[str]] = None
-depends_on: Optional[Sequence[str]] = None
+down_revision: str | None = "202605140001"
+branch_labels: Sequence[str] | None = None
+depends_on: Sequence[str] | None = None
 
 
 def upgrade() -> None:

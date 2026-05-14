@@ -1,4 +1,3 @@
-from typing import Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -26,5 +25,5 @@ class DocumentRepository:
         await self.session.flush()
         return document
 
-    async def get(self, document_id: str) -> Optional[Document]:
+    async def get(self, document_id: str) -> Document | None:
         return await self.session.get(Document, document_id)
