@@ -157,6 +157,21 @@ When Langfuse credentials are configured, traces are automatically captured for:
 
 See [docs/evals.md](docs/evals.md) for evaluation framework.
 
+## Graph Visualization
+
+Generate static images of agent graphs:
+
+```bash
+uv run python scripts/export_graphs.py
+```
+
+Output: `docs/graphs/*.png`
+
+Images show the structure of:
+- Orchestrator routing logic
+- RAG agent retrieval flow
+- Tool agent execution flow
+
 ## Running Evaluations
 
 ```bash
