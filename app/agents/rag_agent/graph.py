@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, Protocol, cast
 
 from langgraph.graph import END, START, StateGraph
 
@@ -9,9 +9,14 @@ from app.agents.rag_agent.state import RagAgentState
 from app.agents.shared.prompt_loader import PromptLoader
 
 
+class Retriever(Protocol):
+    async def search(self, query: str, limit: int = 5) -> Any: ...
+
+
 class RagAgentGraph:
-    def __init__(self, default_model: str) -> None:
+    def __init__(self, default_model: str, retriever: Retriever | None = None) -> None:
         self._default_model = default_model
+        self._retriever = retriever
         self._prompt_loader = PromptLoader(Path(__file__).parent / "prompts")
         self._answer_prompt = self._prompt_loader.render("answer.md", {})
         self._graph = self._build_graph().compile()
@@ -23,9 +28,25 @@ class RagAgentGraph:
         graph.add_edge("answer", END)
         return graph
 
-    def _answer(self, state: RagAgentState) -> dict[str, str]:
+    async def _answer(self, state: RagAgentState) -> dict[str, str]:
+        response_text = self._answer_prompt
+
+        # If retriever available, retrieve context
+        if self._retriever:
+            input_text = cast(str, state.get("input_text", ""))
+            results = await self._retriever.search(input_text, limit=5)
+
+            # Build context from retrieved chunks
+            context_parts = []
+            for result in results:
+                context_parts.append(f"- {result.content}")
+
+            if context_parts:
+                context = "\n".join(context_parts)
+                response_text = f"Context:\n{context}\n\nAnswer: {self._answer_prompt}"
+
         return {
-            "response_text": self._answer_prompt,
+            "response_text": response_text,
             "response_model": cast(str | None, state.get("model")) or self._default_model,
         }
 
