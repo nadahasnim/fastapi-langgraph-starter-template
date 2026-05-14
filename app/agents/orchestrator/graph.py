@@ -71,6 +71,10 @@ class OrchestratorGraph:
         graph.add_edge("direct", END)
         return graph
 
+    def get_compiled_graph(self):
+        """Return compiled graph for visualization."""
+        return self._graph
+
     def _route_input(self, state: OrchestratorRuntimeState) -> dict[str, object]:
         try:
             input_text = validate_input_text(state["input_text"])
