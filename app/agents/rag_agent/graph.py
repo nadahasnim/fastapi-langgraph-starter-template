@@ -28,6 +28,10 @@ class RagAgentGraph:
         graph.add_edge("answer", END)
         return graph
 
+    def get_compiled_graph(self):
+        """Return compiled graph for visualization."""
+        return self._graph
+
     async def _answer(self, state: RagAgentState) -> dict[str, str]:
         response_text = self._answer_prompt
 
