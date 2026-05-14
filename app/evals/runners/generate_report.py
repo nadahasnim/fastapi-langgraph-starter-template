@@ -8,7 +8,14 @@ def generate_markdown_report(results: list[EvalResult]) -> str:
     passed = sum(1 for r in results if r.passed)
     failed = len(results) - passed
 
-    report = ["# Eval Report", "", f"**Summary:** {passed} passed, {failed} failed", "", "## Results", ""]
+    report = [
+        "# Eval Report",
+        "",
+        f"**Summary:** {passed} passed, {failed} failed",
+        "",
+        "## Results",
+        "",
+    ]
 
     for result in results:
         status = "✅" if result.passed else "❌"

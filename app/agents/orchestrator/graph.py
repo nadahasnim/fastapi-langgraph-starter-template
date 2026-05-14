@@ -156,7 +156,9 @@ class OrchestratorGraph:
                     ),
                 )
                 try:
-                    response_text = validate_output_text(cast(str, final_state.get("response_text", "")))
+                    response_text = validate_output_text(
+                        cast(str, final_state.get("response_text", ""))
+                    )
                     route = cast(RouteName, final_state.get("route", "guardrail"))
                 except GuardrailViolation:
                     response_text = self._GUARDRAIL_TEXT
@@ -165,7 +167,8 @@ class OrchestratorGraph:
                 response = self._response_formatter.format_text(
                     response_text,
                     metadata={**metadata, "route": route},
-                    model=model or cast(str, final_state.get("response_model", self._default_model)),
+                    model=model
+                    or cast(str, final_state.get("response_model", self._default_model)),
                 )
                 trace.update(output={"route": route, "response_id": response.id})
                 return response

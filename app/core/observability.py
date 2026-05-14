@@ -53,7 +53,9 @@ class Observability:
                 host=host or "https://cloud.langfuse.com",
             )
 
-    def start_trace(self, name: str, metadata: dict[str, Any] | None = None) -> NoopTrace | LangfuseTrace:
+    def start_trace(
+        self, name: str, metadata: dict[str, Any] | None = None
+    ) -> NoopTrace | LangfuseTrace:
         """Start a new observation without setting it as current context."""
         if not self._client:
             return NoopTrace()

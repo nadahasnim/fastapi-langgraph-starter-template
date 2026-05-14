@@ -12,17 +12,25 @@ from app.services.response_service import ResponseService
 class MockOrchestrator:
     """Mock orchestrator for testing."""
 
-    async def invoke(self, input_text: str, metadata: dict, model: str | None = None):
-        return ResponseObject.create_text_response("resp_eval", model or "test-model", "Template response", {})
+    async def invoke(
+        self, input_text: str, metadata: dict, model: str | None = None
+    ):
+        return ResponseObject.create_text_response(
+            "resp_eval", model or "test-model", "Template response", {}
+        )
 
 
-async def run_dataset(dataset_path: Path, service: ResponseService | None = None) -> list[EvalResult]:
+async def run_dataset(
+    dataset_path: Path, service: ResponseService | None = None
+) -> list[EvalResult]:
     """Run evaluation dataset and return results."""
     with open(dataset_path, encoding="utf-8") as f:
         dataset = yaml.safe_load(f)
 
     if service is None:
-        service = ResponseService(default_model="test-model", orchestrator=MockOrchestrator())
+        service = ResponseService(
+            default_model="test-model", orchestrator=MockOrchestrator()
+        )
 
     results: list[EvalResult] = []
 
@@ -47,3 +55,19 @@ async def run_dataset(dataset_path: Path, service: ResponseService | None = None
                 )
 
     return results
+
+
+if __name__ == "__main__":
+    import asyncio
+    import sys
+
+    if len(sys.argv) < 2:
+        print("Usage: python -m app.evals.runners.run_dataset <dataset_path>")
+        sys.exit(1)
+
+    dataset_path = Path(sys.argv[1])
+    results = asyncio.run(run_dataset(dataset_path))
+
+    for result in results:
+        status = "✅" if result.passed else "❌"
+        print(f"{status} {result.name}: {result.message}")

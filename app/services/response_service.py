@@ -51,7 +51,9 @@ class ResponseService:
         ) as trace:
             try:
                 response = ResponseObject.model_validate(
-                    await self.orchestrator.invoke(request.input, dict(request.metadata), request.model)
+                    await self.orchestrator.invoke(
+                        request.input, dict(request.metadata), request.model
+                    )
                 )
                 trace.update(output={"response_id": response.id, "model": response.model})
             except Exception as e:
