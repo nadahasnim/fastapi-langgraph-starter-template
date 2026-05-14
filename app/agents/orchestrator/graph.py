@@ -1,0 +1,157 @@
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Any, cast
+
+from langgraph.graph import END, START, StateGraph
+
+from app.agents.orchestrator.state import OrchestratorRuntimeState, RouteName
+from app.agents.rag_agent.graph import RagAgentGraph
+from app.agents.shared.guardrails import (
+    GuardrailViolation,
+    validate_input_text,
+    validate_output_text,
+)
+from app.agents.shared.llm import LlmMessage, LlmProvider
+from app.agents.shared.prompt_loader import PromptLoader
+from app.agents.shared.response_formatter import ResponseFormatter
+from app.agents.tool_agent.graph import ToolAgentGraph
+from app.api.v1.schemas.responses import ResponseObject
+
+
+class OrchestratorGraph:
+    _GUARDRAIL_TEXT = "Please send a non-empty, safe request so I can help."
+
+    def __init__(self, llm_provider: LlmProvider, default_model: str) -> None:
+        self._llm_provider = llm_provider
+        self._default_model = default_model
+        self._response_formatter = ResponseFormatter(default_model=default_model)
+        self._prompt_loader = PromptLoader(Path(__file__).parent / "prompts")
+        self._system_prompt = self._prompt_loader.render("system.md", {})
+        router_prompt = self._prompt_loader.render("router.md", {}).lower()
+        self._rag_terms = tuple(
+            term for term in ("knowledge", "document") if term in router_prompt
+        ) or ("knowledge", "document")
+        self._tool_terms = tuple(term for term in ("tool",) if term in router_prompt) or ("tool",)
+        self._rag_graph = RagAgentGraph(default_model=default_model)
+        self._tool_graph = ToolAgentGraph(default_model=default_model)
+        self._graph = self._build_graph().compile()
+
+    def _build_graph(self) -> StateGraph:
+        graph = StateGraph(OrchestratorRuntimeState)
+        graph.add_node("route", self._route_input)
+        graph.add_node("guardrail", self._guardrail_response)
+        graph.add_node("clarify", self._clarification_response)
+        graph.add_node("rag", self._rag_response)
+        graph.add_node("tool", self._tool_response)
+        graph.add_node("direct", self._direct_response)
+        graph.add_edge(START, "route")
+        graph.add_conditional_edges(
+            "route",
+            self._select_route,
+            {
+                "guardrail": "guardrail",
+                "clarify": "clarify",
+                "rag": "rag",
+                "tool": "tool",
+                "direct": "direct",
+            },
+        )
+        graph.add_edge("guardrail", END)
+        graph.add_edge("clarify", END)
+        graph.add_edge("rag", END)
+        graph.add_edge("tool", END)
+        graph.add_edge("direct", END)
+        return graph
+
+    def _route_input(self, state: OrchestratorRuntimeState) -> dict[str, object]:
+        try:
+            input_text = validate_input_text(state["input_text"])
+        except GuardrailViolation:
+            return {"route": "guardrail"}
+
+        normalized_text = input_text.lower()
+        if len(input_text.strip()) < 3:
+            route: RouteName = "clarify"
+        elif any(term in normalized_text for term in self._rag_terms):
+            route = "rag"
+        elif any(term in normalized_text for term in self._tool_terms):
+            route = "tool"
+        else:
+            route = "direct"
+
+        return {"input_text": input_text, "route": route}
+
+    def _select_route(self, state: OrchestratorRuntimeState) -> RouteName:
+        return cast(RouteName, state.get("route", "guardrail"))
+
+    def _guardrail_response(self, state: OrchestratorRuntimeState) -> dict[str, object]:
+        return {
+            "response_text": self._GUARDRAIL_TEXT,
+            "response_model": cast(str | None, state.get("model")) or self._default_model,
+        }
+
+    def _clarification_response(self, state: OrchestratorRuntimeState) -> dict[str, object]:
+        return {
+            "response_text": "Could you provide more detail so I can answer accurately?",
+            "response_model": cast(str | None, state.get("model")) or self._default_model,
+        }
+
+    async def _rag_response(self, state: OrchestratorRuntimeState) -> dict[str, object]:
+        return cast(
+            dict[str, object],
+            await self._rag_graph.invoke(
+                state["input_text"], state["metadata"], cast(str | None, state.get("model"))
+            ),
+        )
+
+    async def _tool_response(self, state: OrchestratorRuntimeState) -> dict[str, object]:
+        return cast(
+            dict[str, object],
+            await self._tool_graph.invoke(
+                state["input_text"], state["metadata"], cast(str | None, state.get("model"))
+            ),
+        )
+
+    async def _direct_response(self, state: OrchestratorRuntimeState) -> dict[str, object]:
+        response = await self._llm_provider.complete(
+            [
+                LlmMessage(role="system", content=self._system_prompt),
+                LlmMessage(role="user", content=state["input_text"]),
+            ],
+            model=cast(str | None, state.get("model")) or self._default_model,
+        )
+        try:
+            response_text = validate_output_text(response.text)
+            route: RouteName = "direct"
+        except GuardrailViolation:
+            response_text = self._GUARDRAIL_TEXT
+            route = "guardrail"
+
+        return {
+            "response_text": response_text,
+            "response_model": response.model,
+            "route": route,
+        }
+
+    async def invoke(
+        self, input_text: str, metadata: dict[str, Any], model: str | None = None
+    ) -> ResponseObject:
+        final_state = cast(
+            OrchestratorRuntimeState,
+            await self._graph.ainvoke(
+                {"input_text": input_text, "metadata": metadata, "model": model}
+            ),
+        )
+        try:
+            response_text = validate_output_text(cast(str, final_state.get("response_text", "")))
+            route = cast(RouteName, final_state.get("route", "guardrail"))
+        except GuardrailViolation:
+            response_text = self._GUARDRAIL_TEXT
+            route = "guardrail"
+
+        return self._response_formatter.format_text(
+            response_text,
+            metadata={**metadata, "route": route},
+            model=model or cast(str, final_state.get("response_model", self._default_model)),
+        )

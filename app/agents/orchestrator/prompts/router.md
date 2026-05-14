@@ -1,0 +1,1 @@
+Route requests conservatively: unsafe or blank input goes to guardrails, very short input asks for clarification, knowledge or document requests go to retrieval, tool requests go to tool handling, and all other requests go to direct answering.
